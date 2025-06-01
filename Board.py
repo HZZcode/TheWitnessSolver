@@ -38,6 +38,11 @@ class Grid(BoardObject):
 
 
 @dataclass
+class BoardPart:
+    grids: set[Coordinate] = field(default_factory=set)
+
+
+@dataclass
 class Board:
     width: int
     height: int
@@ -55,6 +60,9 @@ class Board:
             point + SegmentDirection.X, point - SegmentDirection.X,
             point + SegmentDirection.Y, point - SegmentDirection.Y
         ]))
+
+    def in_board_grid(self, point: Coordinate) -> bool:
+        return 0 <= point.x < self.width and 0 <= point.y < self.height
 
     def is_connected(self, pos: SegmentPos) -> bool:
         return pos not in self.segments or self.segments[pos].connected
@@ -78,3 +86,21 @@ class Board:
 
     def add_grid_shape(self, x: int, y: int, shape: Shape) -> None:
         self.grids[Coordinate(x, y)].shapes.append(shape)
+
+    def find_including_part(self, grid: Coordinate, path: Path) -> BoardPart:
+        grids: set[Coordinate] = set()
+
+        def finder(current: Coordinate, found: list[Coordinate] | None = None) -> None:
+            if found is None:
+                found = []
+            grids.add(current)
+            for d1, d2 in ((SegmentDirection.X, SegmentDirection.Y), (SegmentDirection.Y, SegmentDirection.X)):
+                if self.in_board_grid(near := current + d1) and SegmentPos(current + d1, d2) not in path.segments:
+                    if near not in found:
+                        finder(near, found + [current])
+                if self.in_board_grid(near := current - d1) and SegmentPos(current, d2) not in path.segments:
+                    if near not in found:
+                        finder(near, found + [current])
+
+        finder(grid)
+        return BoardPart(grids)

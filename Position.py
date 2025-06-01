@@ -46,9 +46,6 @@ class SegmentPos(Position):
     def __str__(self) -> str:
         return f'{self.coordinate} ~ {self.coordinate + self.direction}'
 
-    def __repr__(self) -> str:
-        return str(self)
-
     @staticmethod
     @dispatch(int, int, int, int)
     def between(x1: int, y1: int, x2: int, y2: int) -> 'SegmentPos':
