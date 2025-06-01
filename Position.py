@@ -3,6 +3,8 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Self
 
+from multipledispatch import dispatch
+
 
 class Position(ABC):
     ...
@@ -41,7 +43,19 @@ class SegmentPos(Position):
     coordinate: Coordinate
     direction: SegmentDirection
 
+    def __str__(self) -> str:
+        return f'{self.coordinate} ~ {self.coordinate + self.direction}'
+
+    def __repr__(self) -> str:
+        return str(self)
+
     @staticmethod
+    @dispatch(int, int, int, int)
+    def between(x1: int, y1: int, x2: int, y2: int) -> 'SegmentPos':
+        return SegmentPos.between(Coordinate(x1, y1), Coordinate(x2, y2))
+
+    @staticmethod
+    @dispatch(Coordinate, Coordinate)
     def between(p: Coordinate, q: Coordinate) -> 'SegmentPos':
         if p.x + 1 == q.x and p.y == q.y:
             return SegmentPos(p, SegmentDirection.X)

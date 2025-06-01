@@ -10,6 +10,10 @@ class Path:
     points: list[Coordinate]
     goal: Coordinate
 
+    @property
+    def segments(self) -> list[SegmentPos]:
+        return [SegmentPos.between(p, q) for p, q in zip(self.points[:-1], self.points[1:])]
+
     @dispatch(Coordinate, Coordinate)
     def __init__(self, start: Coordinate, goal: Coordinate):
         self.__init__([start], goal)

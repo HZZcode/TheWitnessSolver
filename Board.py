@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Self
 
+from DefaultedDict import DefaultedDict
 from Position import Coordinate, SegmentPos, Position, SegmentDirection
 from Shape import Shape
 from Path import Path
@@ -22,9 +23,10 @@ class Point(BoardObject):
     """Its x ranges in [0, width], y ranges in [0, height], and the left-down grid is (0,0)."""
 
 
+@dataclass
 class Segment(BoardObject):
     """Represents a segment from `coordinate` to `coordinate` + `direction`."""
-    connected: bool
+    connected: bool = field(default=True)
 
     def with_connected(self, connected: bool) -> Self:
         self.connected = connected
@@ -41,9 +43,9 @@ class Board:
     height: int
     start_point: Coordinate
     end_point: Coordinate
-    points: dict[Coordinate, Point] = field(default_factory=dict)
-    segments: dict[SegmentPos, Segment] = field(default_factory=dict)
-    grids: dict[Coordinate, Grid] = field(default_factory=dict)
+    points: dict[Coordinate, Point] = field(default_factory=DefaultedDict(Coordinate, Point))
+    segments: dict[SegmentPos, Segment] = field(default_factory=DefaultedDict(SegmentPos, Segment))
+    grids: dict[Coordinate, Grid] = field(default_factory=DefaultedDict(Coordinate, Grid))
 
     def in_board(self, point: Coordinate) -> bool:
         return 0 <= point.x <= self.width and 0 <= point.y <= self.height
@@ -61,3 +63,18 @@ class Board:
         return (all(point.check(self, pos, path) for pos, point in self.points.items())
                 and all(segment.check(self, pos, path) for pos, segment in self.segments.items())
                 and all(grid.check(self, pos, path) for pos, grid in self.grids.items()))
+
+    def connect(self, pos: SegmentPos) -> None:
+        self.segments[pos].connected = True
+
+    def disconnect(self, pos: SegmentPos) -> None:
+        self.segments[pos].connected = False
+
+    def add_point_shape(self, x: int, y: int, shape: Shape) -> None:
+        self.points[Coordinate(x, y)].shapes.append(shape)
+
+    def add_segment_shape(self, pos: SegmentPos, shape: Shape) -> None:
+        self.segments[pos].shapes.append(shape)
+
+    def add_grid_shape(self, x: int, y: int, shape: Shape) -> None:
+        self.grids[Coordinate(x, y)].shapes.append(shape)
