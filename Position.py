@@ -1,6 +1,6 @@
 from abc import ABC
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Self
 
 from multipledispatch import dispatch
@@ -28,13 +28,13 @@ class Coordinate(Position):
     def __str__(self) -> str:
         return f"({self.x}, {self.y})"
 
-    def __add__(self, other: SegmentDirection) -> Self:
+    def __add__(self, other: SegmentDirection | Self) -> Self:
         return Coordinate(self.x + other.x, self.y + other.y)
 
-    def __sub__(self, other: SegmentDirection) -> Self:
+    def __sub__(self, other: SegmentDirection | Self) -> Self:
         return Coordinate(self.x - other.x, self.y - other.y)
 
-    def __radd__(self, other: SegmentDirection) -> Self:
+    def __radd__(self, other: SegmentDirection | Self) -> Self:
         return Coordinate(self.x + other.x, self.y + other.y)
 
     def nears(self) -> list['SegmentPos']:
@@ -67,3 +67,38 @@ class SegmentPos(Position):
         if p.x == q.x and p.y == q.y + 1:
             return SegmentPos(q, SegmentDirection.Y)
         raise ValueError(f'{p} and {q} are not in a segment')
+
+
+@dataclass
+class BoardPart:
+    grids: set[Coordinate] = field(default_factory=set)
+    rotate: bool = field(default=False)
+
+    def __str__(self):
+        return '{' + ','.join(map(str, self.grids)) + '}'
+
+    def __len__(self) -> int:
+        return len(self.grids)
+
+    def __sub__(self, other: Self) -> set[Coordinate]:
+        return {grid1 - grid2 for grid1 in self.grids for grid2 in other.grids}
+
+    def __add__(self, other: Coordinate) -> Self:
+        return BoardPart({grid + other for grid in self.grids})
+
+    def __le__(self, other: Self) -> bool:
+        return self.grids <= other.grids
+
+    def diff(self, other: Self) -> Self:
+        return BoardPart({grid for grid in self.grids if grid not in other.grids})
+
+    def match(self, parts: list[Self]) -> bool:
+        if not self.rotate:
+            if len(self) == len(parts) == 0:
+                return True
+            if len(self) != sum(map(len, parts)):
+                return False
+            part = parts[0]
+            return any(self.diff(part + diff).match(parts[1:]) for diff in self - part if part + diff <= self)
+        else:
+            return True # TODO

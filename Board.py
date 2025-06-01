@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Self
 
 from DefaultedDict import DefaultedDict
-from Position import Coordinate, SegmentPos, Position, SegmentDirection
+from Position import Coordinate, SegmentPos, Position, SegmentDirection, BoardPart
 from Shape import Shape
 from Path import Path
 
@@ -35,11 +35,6 @@ class Segment(BoardObject):
 
 class Grid(BoardObject):
     """Its x ranges in [0, width), y ranges in [0, height), and the left-down grid is (0,0)."""
-
-
-@dataclass
-class BoardPart:
-    grids: set[Coordinate] = field(default_factory=set)
 
 
 @dataclass

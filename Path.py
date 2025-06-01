@@ -39,8 +39,9 @@ def find_paths(board: 'Board') -> list[Path]:
 
     def finder(current: Path) -> None:
         last: Coordinate = current.points[-1]
-        if last == goal and board.check(current):
-            paths.append(current)
+        if last == goal:
+            if board.check(current):
+                paths.append(current)
             return
         for near in board.nears(last):
             if near not in current.points and board.is_connected(SegmentPos.between(last, near)):
