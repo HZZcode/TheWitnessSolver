@@ -37,6 +37,10 @@ class Coordinate(Position):
     def __radd__(self, other: SegmentDirection) -> Self:
         return Coordinate(self.x + other.x, self.y + other.y)
 
+    def nears(self) -> list['SegmentPos']:
+        return [SegmentPos(self, SegmentDirection.X), SegmentPos(self + SegmentDirection.Y, SegmentDirection.X),
+                SegmentPos(self, SegmentDirection.Y), SegmentPos(self + SegmentDirection.X, SegmentDirection.Y)]
+
 
 @dataclass(frozen=True, unsafe_hash=True)
 class SegmentPos(Position):
