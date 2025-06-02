@@ -6,8 +6,8 @@ from Shape import Block
 
 def main() -> None:
     board = Board(2, 2, Coordinate(0, 0), Coordinate(2, 2))
-    board.add_grid_shape(0, 0, Block(BoardPart({Coordinate(0, 0), Coordinate(0, 1)})))
-    board.add_grid_shape(1, 0, Block(BoardPart({Coordinate(0, 0), Coordinate(0, 1)})))
+    board.add_grid_shape(0, 0, Block(BoardPart.from_str(['#', '#'], rotate=True)))
+    board.add_grid_shape(1, 1, Block(BoardPart.from_str(['#', '#'], rotate=True)))
     paths = find_paths(board)
     for path in paths:
         print(path)

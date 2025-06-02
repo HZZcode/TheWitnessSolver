@@ -1,6 +1,8 @@
 from abc import ABC
+from collections.abc import Callable
 from enum import Enum
 from dataclasses import dataclass, field
+from itertools import product
 from typing import Self
 
 from multipledispatch import dispatch
@@ -69,13 +71,36 @@ class SegmentPos(Position):
         raise ValueError(f'{p} and {q} are not in a segment')
 
 
+class Rotation(Enum):
+    Rotate0 = lambda coordinate: Coordinate(coordinate.x, coordinate.y)
+    Rotate90 = lambda coordinate: Coordinate(coordinate.y, -coordinate.x)
+    Rotate180 = lambda coordinate: Coordinate(-coordinate.x, -coordinate.y)
+    Rotate270 = lambda coordinate: Coordinate(-coordinate.y, coordinate.x)
+
+    @staticmethod
+    def values():
+        return [Rotation.Rotate0, Rotation.Rotate90, Rotation.Rotate180, Rotation.Rotate270]
+
+    def __init__(self, translation: Callable[[Coordinate], Coordinate]):
+        self.translation = translation
+
+    def __call__(self, coordinate: Coordinate) -> Coordinate:
+        return self.translation(coordinate)
+
+
 @dataclass
 class BoardPart:
     grids: set[Coordinate] = field(default_factory=set)
-    rotate: bool = field(default=False)
+    rotate: bool = field(default=False, kw_only=True)
 
     def __str__(self):
         return '{' + ','.join(map(str, self.grids)) + '}'
+
+    @staticmethod
+    def from_str(rows: list[str], *, rotate: bool = False) -> 'BoardPart':
+        """e.g. from_str(['#', '# ', '##']) -> {(0, 0), (0, 1), (0, 2), (1, 0)}"""
+        return BoardPart({Coordinate(-row, column) for row, s in enumerate(rows)
+                          for column, c in enumerate(s) if c != ' '}, rotate=rotate)
 
     def __len__(self) -> int:
         return len(self.grids)
@@ -92,13 +117,20 @@ class BoardPart:
     def diff(self, other: Self) -> Self:
         return BoardPart({grid for grid in self.grids if grid not in other.grids})
 
+    def translate(self, rotation: Rotation) -> Self:
+        return BoardPart({rotation(grid) for grid in self.grids}, rotate=False)
+
+    def rotations(self) -> list[Self]:
+        return [self.translate(rotation) for rotation in Rotation.values()] if self.rotate else [self]
+
     def match(self, parts: list[Self]) -> bool:
-        if not self.rotate:
+        if self.rotate or any(part.rotate for part in parts):
+            return any(rotated.match(list(rotated_parts)) for rotated in self.rotations()
+                       for rotated_parts in product(*[part.rotations() for part in parts]))
+        else:
             if len(self) == len(parts) == 0:
                 return True
             if len(self) != sum(map(len, parts)):
                 return False
             part = parts[0]
             return any(self.diff(part + diff).match(parts[1:]) for diff in self - part if part + diff <= self)
-        else:
-            return True # TODO
