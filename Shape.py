@@ -42,11 +42,12 @@ class Square(Shape, Colored):
 @dataclass
 class Block(Shape):
     shape: 'BoardPart'
+
     def check(self, board: 'Board', pos: Position, path: Path) -> bool:
         if isinstance(pos, Coordinate):
             part: 'BoardPart' = board.find_including_part(pos, path)
             parts: list['BoardPart'] = [block.shape for grid in part.grids
-                       for block in board.grids[grid].shapes if isinstance(block, Block)]
+                                        for block in board.grids[grid].shapes if isinstance(block, Block)]
             return part.match(parts)
         else:
             return False
@@ -72,3 +73,8 @@ class Triangle(Shape):
             return sum(near in path.segments for near in pos.nears()) == self.count
         else:
             return False
+
+
+class Jack(Shape):
+    def check(self, board: 'Board', pos: Position, path: Path) -> bool:
+        return True  # Its checking is implement in Board

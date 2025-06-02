@@ -1,9 +1,10 @@
+from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Self
+from typing import Self, Generator
 
 from DefaultedDict import DefaultedDict
 from Position import Coordinate, SegmentPos, Position, SegmentDirection, BoardPart
-from Shape import Shape
+from Shape import Shape, Jack
 from Path import Path
 
 
@@ -17,6 +18,17 @@ class BoardObject:
 
     def check(self, board: 'Board', pos: Position, path: Path) -> bool:
         return all(shape.check(board, pos, path) for shape in self.shapes)
+
+    def without_one_shape(self) -> Generator[Self, None, None]:
+        for i in range(len(self.shapes)):
+            copied = deepcopy(self)
+            copied.shapes.remove(copied.shapes[i])
+            yield copied
+
+    def without_jack(self) -> Self:
+        copied = deepcopy(self)
+        copied.shapes.remove([shape for shape in copied.shapes if isinstance(shape, Jack)][0])
+        return copied
 
 
 class Point(BoardObject):
@@ -62,10 +74,29 @@ class Board:
     def is_connected(self, pos: SegmentPos) -> bool:
         return pos not in self.segments or self.segments[pos].connected
 
+    def with_grid(self, pos: Coordinate, grid: Grid) -> Self:
+        copied = deepcopy(self)
+        copied.grids[pos] = grid
+        return copied
+
+    def diff_jack(self, path: Path, jack_pos: Coordinate) -> list[tuple[Self, Self]]:
+        return [(self.with_grid(jack_pos, self.grids[jack_pos].without_jack()).with_grid(grid, changed),
+                 self.with_grid(jack_pos, self.grids[jack_pos].without_jack()))
+                for grid in self.find_including_part(jack_pos, path).grids
+                if grid != jack_pos
+                for changed in self.grids[grid].without_one_shape()]
+
     def check(self, path: Path) -> bool:
-        return (all(point.check(self, pos, path) for pos, point in self.points.items())
-                and all(segment.check(self, pos, path) for pos, segment in self.segments.items())
-                and all(grid.check(self, pos, path) for pos, grid in self.grids.items()))
+        jacks: list[Coordinate] = [pos for pos, grid in self.grids.items()
+                                   if any(isinstance(shape, Jack) for shape in grid.shapes)]
+        if len(jacks) != 0:
+            jack_pos = jacks[0]
+            return any(changed[0].check(path) and not changed[1].check(path)
+                       for changed in self.diff_jack(path, jack_pos))
+        else:
+            return (all(point.check(self, pos, path) for pos, point in self.points.items())
+                    and all(segment.check(self, pos, path) for pos, segment in self.segments.items())
+                    and all(grid.check(self, pos, path) for pos, grid in self.grids.items()))
 
     def connect(self, pos: SegmentPos) -> None:
         self.segments[pos].connected = True

@@ -30,6 +30,9 @@ class Coordinate(Position):
     def __str__(self) -> str:
         return f"({self.x}, {self.y})"
 
+    def __repr__(self):
+        return str(self)
+
     def __add__(self, other: SegmentDirection | Self) -> Self:
         return Coordinate(self.x + other.x, self.y + other.y)
 
