@@ -96,6 +96,16 @@ class BoardPart:
     grids: set[Coordinate] = field(default_factory=set)
     rotate: bool = field(default=False, kw_only=True)
 
+    @property
+    def points(self) -> set[Coordinate]:
+        return {point for grid in self.grids
+                for point in [grid, grid + SegmentDirection.X, grid + SegmentDirection.Y,
+                              grid + SegmentDirection.X + SegmentDirection.Y]}
+
+    @property
+    def segments(self) -> set[SegmentPos]:
+        return {segment for grid in self.grids for segment in grid.nears()}
+
     def __str__(self):
         return '{' + ','.join(map(str, self.grids)) + '}'
 

@@ -79,12 +79,32 @@ class Board:
         copied.grids[pos] = grid
         return copied
 
+    def with_segment(self, pos: SegmentPos, segment: Segment) -> Self:
+        copied = deepcopy(self)
+        copied.segments[pos] = segment
+        return copied
+
+    def with_point(self, pos: Coordinate, point: Point) -> Self:
+        copied = deepcopy(self)
+        copied.points[pos] = point
+        return copied
+
     def diff_jack(self, path: Path, jack_pos: Coordinate) -> list[tuple[Self, Self]]:
-        return [(self.with_grid(jack_pos, self.grids[jack_pos].without_jack()).with_grid(grid, changed),
-                 self.with_grid(jack_pos, self.grids[jack_pos].without_jack()))
-                for grid in self.find_including_part(jack_pos, path).grids
+        no_jack = self.with_grid(jack_pos, self.grids[jack_pos].without_jack())
+        part = self.find_including_part(jack_pos, path)
+        diff_grid = [(no_jack.with_grid(grid, changed), no_jack)
+                for grid in part.grids
                 if grid != jack_pos
                 for changed in self.grids[grid].without_one_shape()]
+        diff_segment = [(no_jack.with_segment(segment, changed), no_jack)
+                for segment in part.segments
+                if segment not in path.segments
+                for changed in self.segments[segment].without_one_shape()]
+        diff_point = [(no_jack.with_point(point, changed), no_jack)
+                for point in part.points
+                if point not in path.points
+                for changed in self.points[point].without_one_shape()]
+        return diff_grid + diff_segment + diff_point
 
     def check(self, path: Path) -> bool:
         jacks: list[Coordinate] = [pos for pos, grid in self.grids.items()
