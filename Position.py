@@ -1,11 +1,14 @@
 from abc import ABC
 from collections.abc import Callable
+from copy import deepcopy
 from enum import Enum
 from dataclasses import dataclass, field
 from itertools import product
 from typing import Self
 
 from multipledispatch import dispatch
+
+from GetId import id_getter
 
 
 class Position(ABC):
@@ -45,6 +48,9 @@ class Coordinate(Position):
     def nears(self) -> list['SegmentPos']:
         return [SegmentPos(self, SegmentDirection.X), SegmentPos(self + SegmentDirection.Y, SegmentDirection.X),
                 SegmentPos(self, SegmentDirection.Y), SegmentPos(self + SegmentDirection.X, SegmentDirection.Y)]
+
+    def near(self, other: Self):
+        return abs(self.x - other.x) + abs(self.y - other.y) == 1
 
 
 @dataclass(frozen=True, unsafe_hash=True)
@@ -95,6 +101,15 @@ class Rotation(Enum):
 class BoardPart:
     grids: set[Coordinate] = field(default_factory=set)
     rotate: bool = field(default=False, kw_only=True)
+    negative: bool = field(default=False, kw_only=True)
+    id: int = field(default_factory=id_getter(), kw_only=True)
+
+    @dataclass
+    class BoundBox:
+        x_min: int
+        y_min: int
+        x_max: int
+        y_max: int
 
     @property
     def points(self) -> set[Coordinate]:
@@ -106,26 +121,74 @@ class BoardPart:
     def segments(self) -> set[SegmentPos]:
         return {segment for grid in self.grids for segment in grid.nears()}
 
+    @property
+    def bound_box(self) -> BoundBox:
+        x_set = {grid.x for grid in self.grids}
+        y_set = {grid.y for grid in self.grids}
+        return self.BoundBox(min(x_set), min(y_set), max(x_set), max(y_set))
+
     def __str__(self):
         return '{' + ','.join(map(str, self.grids)) + '}'
 
+    def __repr__(self):
+        return str(self)
+
     @staticmethod
-    def from_str(rows: list[str], *, rotate: bool = False) -> 'BoardPart':
+    def from_str(rows: list[str], *, rotate: bool = False, negative: bool = False) -> 'BoardPart':
         """e.g. from_str(['#', '# ', '##']) -> {(0, 0), (0, 1), (0, 2), (1, 0)}"""
         return BoardPart({Coordinate(-row, column) for row, s in enumerate(rows)
-                          for column, c in enumerate(s) if c != ' '}, rotate=rotate)
+                          for column, c in enumerate(s) if c != ' '}, rotate=rotate, negative=negative)
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, BoardPart) and self.id == other.id
+
+    def __neg__(self) -> Self:
+        """Invert the `negative` property."""
+        copied = deepcopy(self)
+        copied.negative = not self.negative
+        return copied
 
     def __len__(self) -> int:
-        return len(self.grids)
+        """The count of grids; might be negative."""
+        l = len(self.grids)
+        return -l if self.negative else l
 
     def __sub__(self, other: Self) -> set[Coordinate]:
+        """Returns the differences between two part."""
         return {grid1 - grid2 for grid1 in self.grids for grid2 in other.grids}
 
     def __add__(self, other: Coordinate) -> Self:
+        """Translates a part with offset."""
         return BoardPart({grid + other for grid in self.grids})
 
+    def union(self, other: Self) -> Self:
+        return BoardPart(self.grids.union(other.grids))
+
+    def __and__(self, other: Self) -> list[Self]:
+        """Combines two positive parts."""
+        assert not self.negative and not other.negative
+        if self.rotate:
+            return [part for rotated in self.rotations() for part in rotated & other]
+        if other.rotate:
+            return other & self
+        x_diffs = range(self.bound_box.x_min - other.bound_box.x_max - 1,
+                        self.bound_box.x_max - other.bound_box.x_min + 2)
+        y_diffs = range(self.bound_box.y_min - other.bound_box.y_max - 1,
+                        self.bound_box.y_max - other.bound_box.y_min + 2)
+        return [self.union(moved) for dx in x_diffs for dy in y_diffs
+                if self.near(moved := other + Coordinate(dx, dy))
+                if len(self ^ moved) == 0]
+
     def __le__(self, other: Self) -> bool:
+        """Whether a part is included in another."""
         return self.grids <= other.grids
+
+    def __xor__(self, other: Self) -> Self:
+        """Intersection of two parts."""
+        return BoardPart(self.grids.intersection(other.grids))
+
+    def near(self, other: Self) -> bool:
+        return any(pos1.near(pos2) for pos1 in self.grids for pos2 in other.grids)
 
     def diff(self, other: Self) -> Self:
         return BoardPart({grid for grid in self.grids if grid not in other.grids})
@@ -137,13 +200,18 @@ class BoardPart:
         return [self.translate(rotation) for rotation in Rotation.values()] if self.rotate else [self]
 
     def match(self, parts: list[Self]) -> bool:
+        if self.negative:
+            return (-self).match([-part for part in parts])
+        negatives: list[BoardPart] = [part for part in parts if part.negative]
+        if len(negatives) != 0:
+            return any(added.match([part for part in parts if part != neg])
+                       for neg in negatives for added in (-neg) & self)
         if self.rotate or any(part.rotate for part in parts):
             return any(rotated.match(list(rotated_parts)) for rotated in self.rotations()
                        for rotated_parts in product(*[part.rotations() for part in parts]))
-        else:
-            if len(self) == len(parts) == 0:
-                return True
-            if len(self) != sum(map(len, parts)):
-                return False
-            part = parts[0]
-            return any(self.diff(part + diff).match(parts[1:]) for diff in self - part if part + diff <= self)
+        if len(self) == len(parts) == 0:
+            return True
+        if len(self) != sum(map(len, parts)):
+            return False
+        part = parts[0]
+        return any(self.diff(part + diff).match(parts[1:]) for diff in self - part if part + diff <= self)
