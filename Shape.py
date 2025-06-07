@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import StrEnum, auto
 from typing import TYPE_CHECKING
 
 from Position import Position, Coordinate
@@ -14,10 +15,33 @@ class Shape(ABC):
     def check(self, board: 'Board', pos: Position, path: Path) -> bool:
         ...
 
+    def __str__(self) -> str:
+        return f'Shape {type(self).__name__}'
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
+class Colors(StrEnum):
+    Red = auto()
+    Orange = auto()
+    Yellow = auto()
+    Green = auto()
+    Blue = auto()
+    Purple = auto()
+    White = auto()
+    Black = auto()
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
+type ColorType = Colors | str
+
 
 @dataclass
 class Colored:
-    color: str
+    color: ColorType
 
 
 class Hexagon(Shape):
@@ -42,6 +66,12 @@ class Square(Shape, Colored):
 @dataclass
 class Block(Shape):
     shape: 'BoardPart'
+
+    @staticmethod
+    def from_str(rows: list[str], *, rotate: bool = False, negative: bool = False) -> 'Block':
+        """e.g. from_str(['#', '# ', '##']) -> {(0, 0), (0, 1), (0, 2), (1, 0)}"""
+        return Block(BoardPart({Coordinate(-row, column) for row, s in enumerate(rows)
+                                for column, c in enumerate(s) if c != ' '}, rotate=rotate, negative=negative))
 
     def check(self, board: 'Board', pos: Position, path: Path) -> bool:
         if isinstance(pos, Coordinate):

@@ -23,6 +23,9 @@ class Path:
         self.points = points
         self.goal = goal
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __str__(self) -> str:
         points_str: str = '->'.join(map(str, self.points))
         if self.points[-1] == self.goal:

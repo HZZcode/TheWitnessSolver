@@ -1,10 +1,10 @@
 from abc import ABC
 from collections.abc import Callable
 from copy import deepcopy
-from enum import Enum
+from enum import Enum, StrEnum, auto
 from dataclasses import dataclass, field
 from itertools import product
-from typing import Self
+from typing import Self, TypeGuard
 
 from multipledispatch import dispatch
 
@@ -13,6 +13,18 @@ from GetId import id_getter
 
 class Position(ABC):
     ...
+
+
+def is_point(pos: Position) -> TypeGuard['Coordinate']:
+    return isinstance(pos, Coordinate) and pos.type is not CoordinateType.Grid
+
+
+def is_segment(pos: Position) -> TypeGuard['SegmentPos']:
+    return isinstance(pos, SegmentPos)
+
+
+def is_grid(pos: Position) -> TypeGuard['Coordinate']:
+    return isinstance(pos, Coordinate) and pos.type is not CoordinateType.Point
 
 
 class SegmentDirection(Enum):
@@ -25,25 +37,51 @@ class SegmentDirection(Enum):
         self.y = y
 
 
-@dataclass(frozen=True, unsafe_hash=True)
+class CoordinateType(StrEnum):
+    Point = auto()
+    Grid = auto()
+    Unknown = auto()
+
+    def __str__(self) -> str:
+        match self:
+            case CoordinateType.Point:
+                return "[Point]"
+            case CoordinateType.Grid:
+                return "[Grid]"
+            case _:
+                return ""
+
+    def __eq__(self, other: Self) -> bool:
+        return self is other or self is CoordinateType.Unknown or other is CoordinateType.Unknown
+
+    @staticmethod
+    def unknown():
+        return CoordinateType.Unknown
+
+
+@dataclass(frozen=True)
 class Coordinate(Position):
     x: int
     y: int
+    type: CoordinateType = field(default_factory=CoordinateType.unknown, kw_only=True)  # Used only in generating
+
+    def __hash__(self):
+        return hash((self.x, self.y))
 
     def __str__(self) -> str:
-        return f"({self.x}, {self.y})"
+        return f"{self.type}({self.x}, {self.y})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self)
 
     def __add__(self, other: SegmentDirection | Self) -> Self:
-        return Coordinate(self.x + other.x, self.y + other.y)
+        return Coordinate(self.x + other.x, self.y + other.y, type=self.type)
 
     def __sub__(self, other: SegmentDirection | Self) -> Self:
-        return Coordinate(self.x - other.x, self.y - other.y)
+        return Coordinate(self.x - other.x, self.y - other.y, type=self.type)
 
     def __radd__(self, other: SegmentDirection | Self) -> Self:
-        return Coordinate(self.x + other.x, self.y + other.y)
+        return Coordinate(self.x + other.x, self.y + other.y, type=self.type)
 
     def nears(self) -> list['SegmentPos']:
         return [SegmentPos(self, SegmentDirection.X), SegmentPos(self + SegmentDirection.Y, SegmentDirection.X),
@@ -60,6 +98,9 @@ class SegmentPos(Position):
 
     def __str__(self) -> str:
         return f'{self.coordinate} ~ {self.coordinate + self.direction}'
+
+    def __repr__(self) -> str:
+        return str(self)
 
     @staticmethod
     @dispatch(int, int, int, int)
@@ -132,12 +173,6 @@ class BoardPart:
 
     def __repr__(self):
         return str(self)
-
-    @staticmethod
-    def from_str(rows: list[str], *, rotate: bool = False, negative: bool = False) -> 'BoardPart':
-        """e.g. from_str(['#', '# ', '##']) -> {(0, 0), (0, 1), (0, 2), (1, 0)}"""
-        return BoardPart({Coordinate(-row, column) for row, s in enumerate(rows)
-                          for column, c in enumerate(s) if c != ' '}, rotate=rotate, negative=negative)
 
     def __eq__(self, other) -> bool:
         return isinstance(other, BoardPart) and self.id == other.id

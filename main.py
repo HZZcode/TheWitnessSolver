@@ -1,18 +1,15 @@
 from Board import Board
-from Path import find_paths
-from Position import Coordinate, BoardPart
-from Shape import Block
+from Generator import generate_part
+from Path import Path
+from Position import Coordinate
 
 
 def main() -> None:
+    from pprint import pprint
     board = Board(2, 2, Coordinate(0, 0), Coordinate(2, 2))
-    board.add_grid_shape(0, 0, Block(BoardPart.from_str([' #', '##', '##'])))
-    board.add_grid_shape(1, 0, Block(BoardPart.from_str(['#'], negative=True)))
-    board.add_grid_shape(1, 1, Block(BoardPart.from_str(['#'], negative=True)))
-    paths = find_paths(board)
-    for path in paths:
-        print(path)
-    print(f'Found {len(paths)} paths')
+    solution = Path([Coordinate(0, 0), Coordinate(0, 1), Coordinate(0, 2), Coordinate(1, 2), Coordinate(2, 2)],
+                    Coordinate(2, 2))
+    pprint(list(generate_part(board, solution, 10)))
 
 
 if __name__ == "__main__":
