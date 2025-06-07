@@ -168,8 +168,12 @@ class BoardPart:
         y_set = {grid.y for grid in self.grids}
         return self.BoundBox(min(x_set), min(y_set), max(x_set), max(y_set))
 
+    def rotatable(self) -> Self:
+        self.rotate = True
+        return self
+
     def __str__(self):
-        return '{' + ','.join(map(str, self.grids)) + '}'
+        return '{' + ','.join(map(str, self.grids)) + '}' + ('(fixed)' if not self.rotate else '')
 
     def __repr__(self):
         return str(self)

@@ -15,12 +15,6 @@ class Shape(ABC):
     def check(self, board: 'Board', pos: Position, path: Path) -> bool:
         ...
 
-    def __str__(self) -> str:
-        return f'Shape {type(self).__name__}'
-
-    def __repr__(self) -> str:
-        return str(self)
-
 
 class Colors(StrEnum):
     Red = auto()
@@ -70,6 +64,7 @@ class Block(Shape):
     @staticmethod
     def from_str(rows: list[str], *, rotate: bool = False, negative: bool = False) -> 'Block':
         """e.g. from_str(['#', '# ', '##']) -> {(0, 0), (0, 1), (0, 2), (1, 0)}"""
+        from Position import BoardPart
         return Block(BoardPart({Coordinate(-row, column) for row, s in enumerate(rows)
                                 for column, c in enumerate(s) if c != ' '}, rotate=rotate, negative=negative))
 

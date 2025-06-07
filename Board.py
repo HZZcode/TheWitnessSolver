@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Self, Generator
 
 from DefaultedDict import DefaultedDict
-from Position import Coordinate, SegmentPos, Position, SegmentDirection, BoardPart, CoordinateType, is_grid, is_point
+from Position import Coordinate, SegmentPos, Position, SegmentDirection, BoardPart, CoordinateType
 from Shape import Shape, Jack
 from Path import Path
 
@@ -30,6 +30,9 @@ class BoardObject:
         copied.shapes.remove([shape for shape in copied.shapes if isinstance(shape, Jack)][0])
         return copied
 
+    def is_default(self) -> bool:
+        return len(self.shapes) == 0
+
 
 class Point(BoardObject):
     """Its x ranges in [0, width], y ranges in [0, height], and the left-down grid is (0,0)."""
@@ -39,6 +42,9 @@ class Point(BoardObject):
 class Segment(BoardObject):
     """Represents a segment from `coordinate` to `coordinate` + `direction`."""
     connected: bool = field(default=True)
+
+    def is_default(self) -> bool:
+        return self.connected is True and super().is_default()
 
     def with_connected(self, connected: bool) -> Self:
         self.connected = connected
@@ -105,6 +111,15 @@ class Board:
         copied = deepcopy(self)
         copied.points[pos] = point
         return copied
+
+    def without_one_shape(self) -> list[Self]:
+        diff_grid = [self.with_grid(grid, changed) for grid in self.grids.keys()
+                     for changed in self.grids[grid].without_one_shape()]
+        diff_segment = [self.with_segment(segment, changed) for segment in self.segments.keys()
+                        for changed in self.segments[segment].without_one_shape()]
+        diff_point = [self.with_point(point, changed) for point in self.points.keys()
+                      for changed in self.points[point].without_one_shape()]
+        return diff_grid + diff_segment + diff_point
 
     def diff_jack(self, path: Path, jack_pos: Coordinate) -> list[tuple[Self, Self]]:
         no_jack = self.with_grid(jack_pos, self.grids[jack_pos].without_jack())
