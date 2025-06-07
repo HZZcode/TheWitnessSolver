@@ -4,12 +4,13 @@ from copy import deepcopy
 from enum import Enum, StrEnum, auto
 from dataclasses import dataclass, field
 from itertools import product
-from random import randint
+from random import randint, choice
 from typing import Self, TypeGuard
 
 from multipledispatch import dispatch
 
 from GetId import id_getter
+from NoRepr import no_repr
 
 
 class Position(ABC):
@@ -28,6 +29,7 @@ def is_grid(pos: Position) -> TypeGuard['Coordinate']:
     return isinstance(pos, Coordinate) and pos.type is not CoordinateType.Point
 
 
+@no_repr
 class SegmentDirection(Enum):
     X = (1, 0)
     Y = (0, 1)
@@ -37,7 +39,14 @@ class SegmentDirection(Enum):
         self.x = x
         self.y = y
 
+    def __str__(self) -> str:
+        if self == SegmentDirection.X:
+            return 'X'
+        else:  # SegmentDirection.Y
+            return 'Y'
 
+
+@no_repr
 class CoordinateType(StrEnum):
     Point = auto()
     Grid = auto()
@@ -72,9 +81,6 @@ class Coordinate(Position):
     def __str__(self) -> str:
         return f"{self.type}({self.x}, {self.y})"
 
-    def __repr__(self) -> str:
-        return str(self)
-
     def __add__(self, other: SegmentDirection | Self) -> Self:
         return Coordinate(self.x + other.x, self.y + other.y, type=self.type)
 
@@ -92,6 +98,7 @@ class Coordinate(Position):
         return abs(self.x - other.x) + abs(self.y - other.y) == 1
 
 
+@no_repr
 @dataclass(frozen=True, unsafe_hash=True)
 class SegmentPos(Position):
     coordinate: Coordinate
@@ -99,9 +106,6 @@ class SegmentPos(Position):
 
     def __str__(self) -> str:
         return f'{self.coordinate} ~ {self.coordinate + self.direction}'
-
-    def __repr__(self) -> str:
-        return str(self)
 
     @staticmethod
     @dispatch(int, int, int, int)
@@ -139,6 +143,7 @@ class Rotation(Enum):
         return self.translation(coordinate)
 
 
+@no_repr
 @dataclass
 class BoardPart:
     grids: set[Coordinate] = field(default_factory=set)
@@ -174,10 +179,9 @@ class BoardPart:
         return self
 
     def __str__(self):
-        return '{' + ','.join(map(str, self.grids)) + '}' + ('(fixed)' if not self.rotate else '')
-
-    def __repr__(self):
-        return str(self)
+        return ('{' + ','.join(map(str, self.grids)) + '}'
+                + ('(fixed)' if not self.rotate else '')
+                + ('(negative)' if self.negative else ''))
 
     def __eq__(self, other) -> bool:
         return isinstance(other, BoardPart) and self.id == other.id
@@ -257,7 +261,23 @@ class BoardPart:
         return any(self.diff(part + diff).match(parts[1:]) for diff in self - part if part + diff <= self)
 
     def split(self) -> tuple[Self, Self]:
-        grid_sets = [set(), set()]
-        for pos in self.grids:
-            grid_sets[randint(0, 1)].add(pos)
-        return tuple(BoardPart(grids, rotate=True, negative=self.negative) for grids in grid_sets)
+        if randint(0, 2) == 0:
+            negative = choice(common_parts)
+            return -negative, choice(self & negative)
+        else:
+            grid_sets = [set(), set()]
+            for pos in self.grids:
+                grid_sets[randint(0, 1)].add(pos)
+            return tuple(BoardPart(grids, rotate=True, negative=self.negative) for grids in grid_sets)
+
+
+common_parts: list[BoardPart] = [
+    BoardPart({Coordinate(0, 0)}, rotate=True),  # ['#']
+    BoardPart({Coordinate(0, 0), Coordinate(0, 1)}, rotate=True),  # ['##']
+    BoardPart({Coordinate(0, 0), Coordinate(0, 1), Coordinate(0, 2)}, rotate=True),  # ['###']
+    BoardPart({Coordinate(0, 0), Coordinate(0, 1), Coordinate(1, 0)}, rotate=True),  # ['#', '##']
+    BoardPart({Coordinate(0, 0), Coordinate(0, 1), Coordinate(0, 2), Coordinate(0, 3)}, rotate=True),  # ['####']
+    BoardPart({Coordinate(0, 0), Coordinate(0, 1), Coordinate(1, 0), Coordinate(1, 1)}, rotate=True),  # ['##', '##']
+    BoardPart({Coordinate(0, 0), Coordinate(0, 1), Coordinate(0, 2), Coordinate(1, 0)}, rotate=True),  # ['#', '###']
+    BoardPart({Coordinate(0, 0), Coordinate(0, 1), Coordinate(0, 2), Coordinate(1, 1)}, rotate=True),  # [' #', '###']
+]

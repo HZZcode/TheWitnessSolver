@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import StrEnum, auto
 from typing import TYPE_CHECKING
 
+from NoRepr import no_repr
 from Position import Position, Coordinate
 from Path import Path
 
@@ -16,6 +17,7 @@ class Shape(ABC):
         ...
 
 
+@no_repr
 class Colors(StrEnum):
     Red = auto()
     Orange = auto()
@@ -26,9 +28,6 @@ class Colors(StrEnum):
     White = auto()
     Black = auto()
 
-    def __repr__(self) -> str:
-        return str(self)
-
 
 type ColorType = Colors | str
 
@@ -38,12 +37,16 @@ class Colored:
     color: ColorType
 
 
+@no_repr
 class Hexagon(Shape):
     def check(self, board: 'Board', pos: Position, path: Path) -> bool:
         if isinstance(pos, Coordinate):
             return pos in path.points
         else:
             return pos in path.segments
+
+    def __str__(self) -> str:
+        return 'Hexagon'
 
 
 @dataclass
@@ -100,6 +103,10 @@ class Triangle(Shape):
             return False
 
 
+@no_repr
 class Jack(Shape):
     def check(self, board: 'Board', pos: Position, path: Path) -> bool:
         return True  # Its checking is implement in Board
+
+    def __str__(self) -> str:
+        return 'Jack'

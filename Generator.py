@@ -1,14 +1,14 @@
-import random
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
 from itertools import combinations
+from random import randint, choice, shuffle
 from typing import Generator
 
 from Board import Board
 from Path import Path, find_paths
-from Position import Position, is_point, is_segment, Coordinate, SegmentPos, is_grid
-from Shape import Hexagon, Colors, Square, ColorType, Block, Star, Triangle
+from Position import Position, is_point, is_segment, Coordinate, SegmentPos, is_grid, common_parts
+from Shape import Hexagon, Colors, Square, ColorType, Block, Star, Triangle, Shape, Jack
 
 
 class Action(ABC):
@@ -39,7 +39,7 @@ class GridSquareAction(Action):
 
     def apply_on(self, board: Board, solution: Path) -> None:
         colors = board.get_colors_in(self.position, solution)
-        color = random.choice(list(Colors)) if len(colors) == 0 else colors[0]
+        color = choice(list(Colors)) if len(colors) == 0 else colors[0]
         board.add_grid_shape(self.position.x, self.position.y, Square(color))
 
 
@@ -91,7 +91,7 @@ class GridDoubleStarAction(Action):
     def apply_on(self, board: Board, solution: Path) -> None:
         colors = board.get_colors_in(self.positions[0], solution)
         unused = set(Colors) - set(colors)
-        color = random.choice(list(unused))
+        color = choice(list(unused))
         for i in [0, 1]:
             board.add_grid_shape(self.positions[i].x, self.positions[i].y, Star(color))
 
@@ -103,6 +103,33 @@ class GridTriangleAction(Action):
     def apply_on(self, board: Board, solution: Path) -> None:
         segment_count = board.get_segment_count(self.position, solution)
         board.add_grid_shape(self.position.x, self.position.y, Triangle(segment_count))
+
+
+@dataclass
+class GridJackAction(Action):
+    position: Coordinate
+
+    @staticmethod
+    def get_random_grid_shape() -> Shape:
+        match randint(0, 3):
+            case 0:
+                return Square(choice(list(Colors)))
+            case 1:
+                return Block(choice(common_parts))
+            case 2:
+                return Star(choice(list(Colors)))
+            case 3:
+                return Triangle(randint(1, 3))
+            case _:
+                raise NotImplementedError
+
+    def apply_on(self, board: Board, solution: Path) -> None:
+        part = board.find_including_part(self.position, solution).rotatable()
+        spaces: set[Coordinate] = {grid for grid in part.grids
+                                   if len(board.grids[grid].shapes) == 0 and grid != self.position}
+        space = choice(list(spaces))
+        board.add_grid_shape(self.position.x, self.position.y, Jack())
+        board.add_grid_shape(space.x, space.y, self.get_random_grid_shape())
 
 
 def get_actions_on(board: Board, pos: Position, solution: Path) -> Generator[Action, None, None]:
@@ -117,12 +144,14 @@ def get_actions_on(board: Board, pos: Position, solution: Path) -> Generator[Act
         grid = board.grids[pos]
         grids: set[Coordinate] = board.find_including_part(pos, solution).grids
         colors: list[ColorType] = board.get_colors_in(pos, solution)
-        random.shuffle(colors)
+        shuffle(colors)
         single_colors: list[ColorType] = [color for color in colors if colors.count(color) == 1]
-        spaces: set[Coordinate] = {grid for grid in grids if len(board.grids[grid].shapes) == 0}
+        spaces: set[Coordinate] = {grid for grid in grids if len(board.grids[grid].shapes) == 0 and grid != pos}
         if len(grid.shapes) == 0:
             if board.get_segment_count(pos, solution) != 0:
                 yield GridTriangleAction(pos)
+                if len(spaces) != 0:
+                    yield GridJackAction(pos)
             if len(set(colors)) <= 1:
                 yield GridSquareAction(pos)
             if not any(isinstance(shape, Block) for grid in grids for shape in board.grids[grid].shapes):
@@ -154,7 +183,7 @@ def generate(board: Board, solution: Path) -> Generator[Board, None, None]:
             yield modified
             return
         actions: list[Action] = get_actions(modified, solution)
-        random.shuffle(actions)
+        shuffle(actions)
         for action in actions:
             copied = deepcopy(modified)
             action.apply_on(copied, solution)

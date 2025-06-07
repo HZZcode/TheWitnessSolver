@@ -1,3 +1,4 @@
+from NoRepr import no_repr
 from Position import Coordinate, SegmentPos
 from multipledispatch import dispatch
 from typing import TYPE_CHECKING, Self
@@ -5,7 +6,7 @@ from typing import TYPE_CHECKING, Self
 if TYPE_CHECKING:
     from Board import Board
 
-
+@no_repr
 class Path:
     points: list[Coordinate]
     goal: Coordinate
@@ -22,9 +23,6 @@ class Path:
     def __init__(self, points: list[Coordinate], goal: Coordinate):
         self.points = points
         self.goal = goal
-
-    def __repr__(self) -> str:
-        return str(self)
 
     def __str__(self) -> str:
         points_str: str = '->'.join(map(str, self.points))
