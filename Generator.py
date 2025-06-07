@@ -2,12 +2,13 @@ import random
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
+from itertools import combinations
 from typing import Generator
 
 from Board import Board
 from Path import Path, find_paths
 from Position import Position, is_point, is_segment, Coordinate, SegmentPos, is_grid
-from Shape import Hexagon, Colored, Colors, Square, ColorType, Block
+from Shape import Hexagon, Colors, Square, ColorType, Block, Star, Triangle
 
 
 class Action(ABC):
@@ -37,8 +38,7 @@ class GridSquareAction(Action):
     position: Coordinate
 
     def apply_on(self, board: Board, solution: Path) -> None:
-        colors = [shape.color for grid in board.find_including_part(self.position, solution).grids
-                  for shape in board.grids[grid].shapes if isinstance(shape, Colored)]
+        colors = board.get_colors_in(self.position, solution)
         color = random.choice(list(Colors)) if len(colors) == 0 else colors[0]
         board.add_grid_shape(self.position.x, self.position.y, Square(color))
 
@@ -62,6 +62,49 @@ class GridFixBlockAction(Action):
                 shape.shape.rotate = False
 
 
+@dataclass
+class GridSplitBlockAction(Action):
+    position: Coordinate
+    split_positions: tuple[Coordinate, Coordinate]
+    block: Block
+
+    def apply_on(self, board: Board, solution: Path) -> None:
+        parts = self.block.shape.split()
+        board.grids[self.position].shapes.remove(self.block)
+        for i in [0, 1]:
+            board.add_grid_shape(self.split_positions[i].x, self.split_positions[i].y, Block(parts[i]))
+
+
+@dataclass
+class GridSingleStarAction(Action):
+    position: Coordinate
+    color: ColorType
+
+    def apply_on(self, board: Board, solution: Path) -> None:
+        board.add_grid_shape(self.position.x, self.position.y, Star(self.color))
+
+
+@dataclass
+class GridDoubleStarAction(Action):
+    positions: tuple[Coordinate, Coordinate]
+
+    def apply_on(self, board: Board, solution: Path) -> None:
+        colors = board.get_colors_in(self.positions[0], solution)
+        unused = set(Colors) - set(colors)
+        color = random.choice(list(unused))
+        for i in [0, 1]:
+            board.add_grid_shape(self.positions[i].x, self.positions[i].y, Star(color))
+
+
+@dataclass
+class GridTriangleAction(Action):
+    position: Coordinate
+
+    def apply_on(self, board: Board, solution: Path) -> None:
+        segment_count = board.get_segment_count(self.position, solution)
+        board.add_grid_shape(self.position.x, self.position.y, Triangle(segment_count))
+
+
 def get_actions_on(board: Board, pos: Position, solution: Path) -> Generator[Action, None, None]:
     if is_point(pos):
         if (pos in solution.points and pos not in [board.start_point, board.end_point]
@@ -73,16 +116,29 @@ def get_actions_on(board: Board, pos: Position, solution: Path) -> Generator[Act
     if is_grid(pos):
         grid = board.grids[pos]
         grids: set[Coordinate] = board.find_including_part(pos, solution).grids
-        colors: set[ColorType] = {shape.color for grid in grids
-                                  for shape in board.grids[grid].shapes
-                                  if isinstance(shape, Colored)}
+        colors: list[ColorType] = board.get_colors_in(pos, solution)
+        random.shuffle(colors)
+        single_colors: list[ColorType] = [color for color in colors if colors.count(color) == 1]
+        spaces: set[Coordinate] = {grid for grid in grids if len(board.grids[grid].shapes) == 0}
         if len(grid.shapes) == 0:
+            if board.get_segment_count(pos, solution) != 0:
+                yield GridTriangleAction(pos)
             if len(set(colors)) <= 1:
                 yield GridSquareAction(pos)
             if not any(isinstance(shape, Block) for grid in grids for shape in board.grids[grid].shapes):
                 yield GridAddBlockAction(pos)
-        elif isinstance(grid.shapes[0], Block):
-            yield GridFixBlockAction(pos)
+            if len(set(colors)) < len(list(Colors)):
+                for combination in combinations(spaces.union({pos}), 2):
+                    yield GridDoubleStarAction(combination)
+            for color in single_colors:
+                for space in spaces:
+                    yield GridSingleStarAction(space, color)
+        else:
+            shape = grid.shapes[0]
+            if isinstance(shape, Block):
+                yield GridFixBlockAction(pos)
+                for combination in combinations(spaces.union({pos}), 2):
+                    yield GridSplitBlockAction(pos, combination, shape)
 
 
 def get_actions(board: Board, solution: Path) -> list[Action]:

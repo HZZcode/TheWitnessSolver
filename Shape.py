@@ -95,7 +95,7 @@ class Triangle(Shape):
 
     def check(self, board: 'Board', pos: Position, path: Path) -> bool:
         if isinstance(pos, Coordinate):
-            return sum(near in path.segments for near in pos.nears()) == self.count
+            return board.get_segment_count(pos, path) == self.count
         else:
             return False
 

@@ -4,6 +4,7 @@ from copy import deepcopy
 from enum import Enum, StrEnum, auto
 from dataclasses import dataclass, field
 from itertools import product
+from random import randint
 from typing import Self, TypeGuard
 
 from multipledispatch import dispatch
@@ -254,3 +255,9 @@ class BoardPart:
             return False
         part = parts[0]
         return any(self.diff(part + diff).match(parts[1:]) for diff in self - part if part + diff <= self)
+
+    def split(self) -> tuple[Self, Self]:
+        grid_sets = [set(), set()]
+        for pos in self.grids:
+            grid_sets[randint(0, 1)].add(pos)
+        return tuple(BoardPart(grids, rotate=True, negative=self.negative) for grids in grid_sets)

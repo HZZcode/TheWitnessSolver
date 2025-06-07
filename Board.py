@@ -4,7 +4,7 @@ from typing import Self, Generator
 
 from DefaultedDict import DefaultedDict
 from Position import Coordinate, SegmentPos, Position, SegmentDirection, BoardPart, CoordinateType
-from Shape import Shape, Jack
+from Shape import Shape, Jack, ColorType, Colored
 from Path import Path
 
 
@@ -182,3 +182,11 @@ class Board:
 
         finder(grid)
         return BoardPart(grids)
+
+    def get_colors_in(self, grid: Coordinate, path: Path) -> list[ColorType]:
+        return [shape.color for grid in self.find_including_part(grid, path).grids
+                for shape in self.grids[grid].shapes if isinstance(shape, Colored)]
+
+    @staticmethod
+    def get_segment_count(grid: Coordinate, path: Path) -> int:
+        return sum(near in path.segments for near in grid.nears())
